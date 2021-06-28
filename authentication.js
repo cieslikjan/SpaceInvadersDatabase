@@ -93,6 +93,11 @@ app.post('/register', async (req, res) => {
 
 app.post('/login', (req,res) => {
     User.findOne({username: req.body.username}, (err, obj) => {
+
+        //check if obj -> catch err in bcrypt.compare
+        if(obj == null){
+            return res.status(401).send('No such user');
+        }
         bcrypt.compare(req.body.password, obj.password, function(err, result) {
             if (result) {
                 const accessToken = jwt.sign({username : req.body.username}, accessTokenSecret, {expiresIn: '20m'});
@@ -109,7 +114,7 @@ app.post('/login', (req,res) => {
 
                 return res.status(200).send({success: true, msg: "Logged in!"});
             } else {
-                return res.status(400).send('Username or password incorrect');
+                return res.status(401).send('Username or password incorrect');
             }
         });
     });
