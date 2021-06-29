@@ -61,7 +61,13 @@ const authJWT = (req, res, next) => {
 };
 
 app.get('/rank', authJWT, (req, res) => {
-    res.send(req.user);
+    User.findOne({username: req.user.username}, (err, obj) => {
+        if (obj === null) {
+            res.sendStatus(403);
+        }
+
+        res.send({success: true, msg: obj.rank});
+    });
 });
 
 app.post('/register', async (req, res) => {
