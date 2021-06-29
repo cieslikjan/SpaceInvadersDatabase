@@ -12,29 +12,38 @@ const accessTokenSecret = '35gxQ2Mj7W3_H9P=HPAk.Mr?2M4.cu23;pqZ3.t]nFFv_{U)?)EUB
 const refreshTokenSecret = '123';
 var refreshTokens = [];
 
-mongoose.connect("mongodb+srv://testUser:test123@cluster0.xngl3.mongodb.net/userDB", { useNewUrlParser: true, useUnifiedTopology:true });
+mongoose.connect("mongodb+srv://testUser:test123@cluster0.xngl3.mongodb.net/userDB", { useNewUrlParser: true, useUnifiedTopology: true });
 
 mongoose.connection.on('error', (err) => {
     console.log(err);
 });
 
-mongoose.connection.on('connected', () => console.log('Data Db connected'));   
+mongoose.connection.on('connected', () => console.log('Data Db connected'));
 
 const app = express();
-app.use(cors({credentials: true, origin: 'http://spaceinvaders.servegame.com'}));
+app.use(cors({ credentials: true, origin: 'http://spaceinvaders.servegame.com' }));
 app.use(cookieParser());
 
 const port = 8080;
-app.use(express.json({extended:false}));
+app.use(express.json({ extended: false }));
 
 const UserSchema = new mongoose.Schema({
-    username:String,
-    password:String,
-    email:String,
-    rank:Number,
+    username: String,
+    password: String,
+    email: String,
+    rank: Number,
 });
 
 const User = mongoose.model("User", UserSchema);
+
+const GameSchema = new mongoose.Schema({
+    player1: String,
+    player2: String,
+    winner: String,
+});
+
+const Game = mongoose.model("Game", GameSchema);
+
 app.listen(port, () => {
     console.log('Authentication service started on port ' + port);
 });
@@ -47,7 +56,7 @@ const authJWT = (req, res, next) => {
         res.cookie('loggedin', false);
         return res.sendStatus(403);
     }
-    
+
     if (token) {
         jwt.verify(token, accessTokenSecret, (err, user) => {
             if (err) {
@@ -66,54 +75,63 @@ const authJWT = (req, res, next) => {
 
 app.get('/rank', authJWT, (req, res) => {
     console.log(req.user)
-    User.findOne({username: req.user.username}, (err, obj) => {
+
+    User.findOne({ username: req.user.username }, (err, obj) => {
         if (obj === null) {
             res.cookie('loggedin', false);
             return res.sendStatus(403);
         }
 
-        res.send({success: true, msg: obj.rank});
+        let rank = obj.rank;
+
+        Game.find({
+            $and: [
+                { $or: [{ player1: req.user.username }, { player2: req.user.username }] },
+            ]
+        }, (err, obj) => {
+            res.send({ success: true, msg: { rank: rank, games: obj.length } });
+        })
     });
 });
 
 app.post('/register', async (req, res) => {
-    let findUsername = await User.findOne({username: req.body.username}).exec();
+    let findUsername = await User.findOne({ username: req.body.username }).exec();
     if (findUsername !== null) {
-        return res.status(400).send({success: false, msg: "Username nicht einzigartig"});
+        return res.status(400).send({ success: false, msg: "Username nicht einzigartig" });
     }
-    
-    let findEmail = await User.findOne({email: req.body.email}).exec();
+
+    let findEmail = await User.findOne({ email: req.body.email }).exec();
     if (findEmail !== null) {
-        return res.status(400).send({success: false, msg: "Email nicht einzigartig"});
+        return res.status(400).send({ success: false, msg: "Email nicht einzigartig" });
     }
-    
+
     let password = req.body.password;
 
-    bcrypt.genSalt(10, function(err, salt) {
-        bcrypt.hash(password, salt, function(err, hash) {
-            let user = {username: req.body.username, password: hash, email: req.body.email, rank: 0};
+    bcrypt.genSalt(10, function (err, salt) {
+        bcrypt.hash(password, salt, function (err, hash) {
+            let user = { username: req.body.username, password: hash, email: req.body.email, rank: 0 };
 
             new User(user).save().then(user => {
-                return res.status(200).send({success: true, msg: "user saved to database"});
+                return res.status(200).send({ success: true, msg: "user saved to database" });
             }).catch((err) => {
-                return res.status(400).send({success: false, msg: "user not to database"});
+                return res.status(400).send({ success: false, msg: "user not to database" });
             })
         });
     });
 });
 
 
-app.post('/login', (req,res) => {
-    User.findOne({username: req.body.username}, (err, obj) => {
+app.post('/login', (req, res) => {
+    User.findOne({ username: req.body.username }, (err, obj) => {
 
         //check if obj -> catch err in bcrypt.compare
-        if(obj === null){
+        if (obj === null) {
             return res.sendStatus(401);
         }
-        bcrypt.compare(req.body.password, obj.password, function(err, result) {
+        bcrypt.compare(req.body.password, obj.password, function (err, result) {
             if (result) {
-                const accessToken = jwt.sign({username: obj.username}, accessTokenSecret, {expiresIn: '20m'});
-                const refreshToken = jwt.sign({username: obj.username}, refreshTokenSecret);
+                const accessToken = jwt.sign({ username: obj.username }, accessTokenSecret, { expiresIn: '20m' });
+                const refreshToken = jwt.sign({ username: obj.username }, refreshTokenSecret);
 
                 refreshTokens.push(refreshToken);
 
@@ -130,7 +148,7 @@ app.post('/login', (req,res) => {
 
                 res.cookie('username', obj.username);
 
-                return res.status(200).send({success: true, msg: "Logged in!"});
+                return res.status(200).send({ success: true, msg: "Logged in!" });
             } else {
                 return res.status(401).send('Username or password incorrect');
             }
@@ -157,7 +175,7 @@ app.post('/token', (req, res) => {
             return res.sendStatus(403);
         }
 
-        const accessToken = jwt.sign({username: user.username}, accessTokenSecret, { expiresIn: '20m' });
+        const accessToken = jwt.sign({ username: user.username }, accessTokenSecret, { expiresIn: '20m' });
 
         res.cookie('token', accessToken, {
             httpOnly: true,
@@ -173,6 +191,6 @@ app.post('/logout', authJWT, (req, res) => {
     refreshTokens = refreshTokens.filter(t => t !== rtoken);
 
     res.cookie('loggedin', false);
-    res.send({success: true, msg: "Logout successful"});
+    res.send({ success: true, msg: "Logout successful" });
 });
 
