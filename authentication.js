@@ -7,6 +7,7 @@ const dayjs = require('dayjs');
 const cookieParser = require('cookie-parser');
 
 // TODO: Generate on startup
+// Generate file with secret on startup and load in all servers (?)
 const accessTokenSecret = '35gxQ2Mj7W3_H9P=HPAk.Mr?2M4.cu23;pqZ3.t]nFFv_{U)?)EUBwL}y%Fi=gZb';
 const refreshTokenSecret = '123';
 var refreshTokens = [];
@@ -15,11 +16,11 @@ mongoose.connect("mongodb+srv://testUser:test123@cluster0.xngl3.mongodb.net/user
 
 mongoose.connection.on('error', (err) => {
     console.log(err);
-   });
+});
 
 mongoose.connection.on('connected', () => console.log('Data Db connected'));   
 
-const app =  express();
+const app = express();
 app.use(cors({credentials: true, origin: 'http://spaceinvaders.servegame.com'}));
 app.use(cookieParser());
 
@@ -64,10 +65,11 @@ const authJWT = (req, res, next) => {
 };
 
 app.get('/rank', authJWT, (req, res) => {
+    console.log(req.user)
     User.findOne({username: req.user.username}, (err, obj) => {
         if (obj === null) {
             res.cookie('loggedin', false);
-            res.sendStatus(403);
+            return res.sendStatus(403);
         }
 
         res.send({success: true, msg: obj.rank});
@@ -110,8 +112,8 @@ app.post('/login', (req,res) => {
         }
         bcrypt.compare(req.body.password, obj.password, function(err, result) {
             if (result) {
-                const accessToken = jwt.sign({username : req.body.username}, accessTokenSecret, {expiresIn: '20m'});
-                const refreshToken = jwt.sign({username : req.body.username}, refreshTokenSecret);
+                const accessToken = jwt.sign({username: obj.username}, accessTokenSecret, {expiresIn: '20m'});
+                const refreshToken = jwt.sign({username: obj.username}, refreshTokenSecret);
 
                 refreshTokens.push(refreshToken);
 
@@ -125,6 +127,8 @@ app.post('/login', (req,res) => {
                 });
 
                 res.cookie('loggedin', true);
+
+                res.cookie('username', obj.username);
 
                 return res.status(200).send({success: true, msg: "Logged in!"});
             } else {
@@ -153,7 +157,7 @@ app.post('/token', (req, res) => {
             return res.sendStatus(403);
         }
 
-        const accessToken = jwt.sign({ username: user.username }, accessTokenSecret, { expiresIn: '20m' });
+        const accessToken = jwt.sign({username: user.username}, accessTokenSecret, { expiresIn: '20m' });
 
         res.cookie('token', accessToken, {
             httpOnly: true,
