@@ -95,8 +95,8 @@ app.post('/login', (req,res) => {
     User.findOne({username: req.body.username}, (err, obj) => {
 
         //check if obj -> catch err in bcrypt.compare
-        if(obj == null){
-            return res.status(401).send('No such user');
+        if(obj === null){
+            return res.sendStatus(401);
         }
         bcrypt.compare(req.body.password, obj.password, function(err, result) {
             if (result) {
@@ -106,11 +106,13 @@ app.post('/login', (req,res) => {
                 res.cookie('token', accessToken, {
                     httpOnly: true,
                     expires: dayjs().add(20, 'minutes').toDate()
-                })
+                });
 
                 res.cookie('rtoken', refreshToken, {
                     httpOnly: true,
-                })
+                });
+
+                res.cookie('loggedin', true);
 
                 return res.status(200).send({success: true, msg: "Logged in!"});
             } else {
@@ -149,6 +151,7 @@ app.post('/logout', (req, res) => {
     let rtoken = req.cookies.rtoken;
     refreshTokens = refreshTokens.filter(t => t !== rtoken);
 
+    res.cookie('loggedin', false);
     res.send({success: true, msg: "Logout successful"});
 });
 
