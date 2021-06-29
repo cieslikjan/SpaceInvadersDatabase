@@ -20,7 +20,7 @@ mongoose.connection.on('error', (err) => {
 mongoose.connection.on('connected', () => console.log('Data Db connected'));   
 
 const app =  express();
-app.use(cors());
+app.use(cors({credentials: true, origin: 'http://spaceinvaders.servegame.com'}));
 app.use(cookieParser());
 
 const port = 8080;
@@ -103,6 +103,8 @@ app.post('/login', (req,res) => {
                 const accessToken = jwt.sign({username : req.body.username}, accessTokenSecret, {expiresIn: '20m'});
                 const refreshToken = jwt.sign({username : req.body.username}, refreshTokenSecret);
 
+                refreshTokens.push(refreshToken);
+
                 res.cookie('token', accessToken, {
                     httpOnly: true,
                     expires: dayjs().add(20, 'minutes').toDate()
@@ -147,7 +149,7 @@ app.post('/token', (req, res) => {
     });
 });
 
-app.post('/logout', (req, res) => {
+app.post('/logout', authJWT, (req, res) => {
     let rtoken = req.cookies.rtoken;
     refreshTokens = refreshTokens.filter(t => t !== rtoken);
 
