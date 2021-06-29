@@ -43,12 +43,14 @@ const authJWT = (req, res, next) => {
     let rtoken = req.cookies.rtoken;
 
     if (!refreshTokens.includes(rtoken)) {
+        res.cookie('loggedin', false);
         return res.sendStatus(403);
     }
     
     if (token) {
         jwt.verify(token, accessTokenSecret, (err, user) => {
             if (err) {
+                res.cookie('loggedin', false);
                 return res.sendStatus(403);
             }
 
@@ -56,6 +58,7 @@ const authJWT = (req, res, next) => {
             next();
         })
     } else {
+        res.cookie('loggedin', false);
         res.sendStatus(401);
     }
 };
@@ -63,6 +66,7 @@ const authJWT = (req, res, next) => {
 app.get('/rank', authJWT, (req, res) => {
     User.findOne({username: req.user.username}, (err, obj) => {
         if (obj === null) {
+            res.cookie('loggedin', false);
             res.sendStatus(403);
         }
 
@@ -134,15 +138,18 @@ app.post('/token', (req, res) => {
     let rtoken = req.cookies.rtoken;
 
     if (!rtoken) {
+        res.cookie('loggedin', false);
         return res.sendStatus(401);
     }
 
     if (!refreshTokens.includes(rtoken)) {
+        res.cookie('loggedin', false);
         return res.sendStatus(403);
     }
 
-    jwt.verify(token, refreshTokenSecret, (err, user) => {
+    jwt.verify(rtoken, refreshTokenSecret, (err, user) => {
         if (err) {
+            res.cookie('loggedin', false);
             return res.sendStatus(403);
         }
 
@@ -152,6 +159,8 @@ app.post('/token', (req, res) => {
             httpOnly: true,
             expires: dayjs().add(20, 'minutes').toDate()
         })
+
+        res.sendStatus(200);
     });
 });
 
